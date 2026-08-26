@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>班级作业 DDL 共享表</title>
+<style>
+  :root{
+    --red:#f5222d; --orange:#fa8c16; --green:#52c41a; --blue:#1677ff;
+    --gray:#8c8c8c; --bg:#f5f6f8; --card:#ffffff; --line:#ececec; --text:#1f1f1f; --sub:#8a8a8a;
+    --shadow:0 2px 12px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); font-size:14px; line-height:1.5;}
+  .wrap{max-width:960px; margin:0 auto; padding:0 12px 80px;}
+
+  /* Header */
+  header{position:sticky; top:0; z-index:20; background:var(--bg); padding:14px 0 10px;}
+  .title-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .title-row h1{font-size:19px; margin:0; font-weight:700;}
+  .title-row .semester{font-size:12px; color:var(--sub); margin-top:2px;}
+  .lock-btn{border:1px solid var(--line); background:#fff; border-radius:10px; padding:7px 11px; font-size:13px; cursor:pointer; color:#555; white-space:nowrap;}
+  .lock-btn:active{background:#f0f0f0;}
+
+  /* Stats */
+  .stats{display:flex; gap:8px; margin-top:12px;}
+  .stat{flex:1; background:var(--card); border-radius:12px; padding:10px 8px; text-align:center; box-shadow:var(--shadow);}
+  .stat .num{font-size:20px; font-weight:700; line-height:1.1;}
+  .stat .lbl{font-size:11px; color:var(--sub); margin-top:3px;}
+  .stat.total .num{color:var(--blue);}
+  .stat.todo .num{color:var(--red);}
+  .stat.soon .num{color:var(--orange);}
+  .stat.done .num{color:var(--green);}
+
+  /* Toolbar */
+  .toolbar{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px;}
+  .chip{border:1px solid var(--line); background:#fff; border-radius:20px; padding:6px 12px; font-size:12px; cursor:pointer; color:#555; user-select:none;}
+  .chip.active{background:var(--blue); color:#fff; border-color:var(--blue);}
+  .toolbar .grp{display:flex; gap:6px; flex-wrap:wrap;}
+
+  /* Grid */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-top:16px;}
+  .card{background:var(--card); border-radius:14px; padding:14px; box-shadow:var(--shadow); position:relative; border-left:5px solid var(--line);}
+  .card.u-urgent{border-left-color:var(--red);}
+  .card.u-soon{border-left-color:var(--orange);}
+  .card.u-normal{border-left-color:var(--green);}
+  .card.u-over{border-left-color:var(--red);}
+  .card.done{border-left-color:var(--gray); opacity:.78;}
+  .card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .card .course{font-size:12px; color:var(--blue); font-weight:600;}
+  .card .badge-submit{font-size:11px; padding:3px 8px; border-radius:8px; white-space:nowrap; background:#e6f0ff; color:#1677ff;}
+  .card .badge-submit.b2{background:#fff3e0; color:#fa8c16;}
+  .card .badge-submit.b3{background:#e8f7ee; color:#13a452;}
+  .card h3{margin:6px 0 4px; font-size:16px; font-weight:700;}
+  .card .teacher{font-size:12px; color:var(--sub);}
+  .card .teacher a{color:var(--blue); text-decoration:none;}
+  .card .req{font-size:13px; color:#444; margin:8px 0; white-space:pre-wrap; word-break:break-word;}
+  .imgs{display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin:8px 0;}
+  .imgs img{width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; cursor:pointer; background:#f0f0f0;}
+
+  .dates{display:flex; gap:14px; font-size:12px; color:#555; margin-top:6px;}
+  .dates b{font-weight:600; color:#222;}
+  .urgencypill{display:inline-block; font-size:11px; padding:2px 8px; border-radius:8px; margin-top:8px;}
+  .urgencypill.urgent{background:#fff1f0; color:var(--red);}
+  .urgencypill.soon{background:#fff7e6; color:var(--orange);}
+  .urgencypill.normal{background:#f6ffed; color:#13a452;}
+  .urgencypill.over{background:#fff1f0; color:var(--red); font-weight:600;}
+  .urgencypill.done{background:#f5f5f5; color:var(--gray);}
+
+  .mystatus{display:flex; gap:6px; margin-top:10px; border-top:1px dashed var(--line); padding-top:10px;}
+  .mystatus .sbtn{flex:1; border:1px solid var(--line); background:#fff; border-radius:9px; padding:7px 0; font-size:12px; cursor:pointer; color:#666;}
+  .mystatus .sbtn.on{background:var(--blue); color:#fff; border-color:var(--blue);}
+  .mystatus .sbtn.done.on{background:var(--green); border-color:var(--green);}
+
+  .edit-row{display:flex; gap:8px; margin-top:8px;}
+  .edit-row button{flex:1; border:1px solid var(--line); background:#fafafa; border-radius:8px; padding:6px 0; font-size:12px; cursor:pointer; color:#666;}
+
+  .empty{text-align:center; color:var(--sub); padding:50px 0; font-size:14px;}
+
+  /* Modal */
+  .mask{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:50; display:none; align-items:center; justify-content:center; padding:16px;}
+  .mask.show{display:flex;}
+  .modal{background:#fff; border-radius:16px; width:100%; max-width:480px; max-height:90vh; overflow:auto; padding:18px;}
+  .modal h2{margin:0 0 14px; font-size:17px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12px; color:#666; margin-bottom:5px;}
+  .field input,.field textarea,.field select{width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 10px; font-size:14px; font-family:inherit; box-sizing:border-box;}
+  .field textarea{min-height:64px; resize:vertical;}
+  .row2{display:flex; gap:10px;}
+  .row2 .field{flex:1;}
+  .imgprev{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+  .imgprev .p{position:relative;}
+  .imgprev img{width:54px; height:54px; object-fit:cover; border-radius:8px;}
+  .imgprev .x{position:absolute; top:-6px; right:-6px; background:var(--red); color:#fff; border-radius:50%; width:18px; height:18px; font-size:12px; line-height:18px; text-align:center; cursor:pointer;}
+  .modal-actions{display:flex; gap:10px; margin-top:8px;}
+  .modal-actions button{flex:1; border:none; border-radius:10px; padding:11px 0; font-size:15px; cursor:pointer;}
+  .btn-primary{background:var(--blue); color:#fff;}
+  .btn-ghost{background:#f0f0f0; color:#555;}
+  .hint{font-size:12px; color:var(--sub); margin-top:4px;}
+  .toast{position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.82); color:#fff; padding:10px 18px; border-radius:10px; font-size:14px; z-index:99; opacity:0; transition:.25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+  .lightbox{position:fixed; inset:0; background:#000; z-index:80; display:none; align-items:center; justify-content:center;}
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:92%; max-height:92%;}
+  .mocktag{font-size:11px; color:#fa8c16; margin-left:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <div>
+        <h1 id="clsName">班级作业 DDL 共享表<span class="mocktag" id="mockTag"></span></h1>
+        <div class="semester" id="semName">点击右上角 🔒 登录后发布作业</div>
+      </div>
+      <button class="lock-btn" id="lockBtn">🔒 学委登录</button>
+    </div>
+    <div class="stats">
+      <div class="stat total"><div class="num" id="stTotal">0</div><div class="lbl">作业总数</div></div>
+      <div class="stat todo"><div class="num" id="stTodo">0</div><div class="lbl">未完成</div></div>
+      <div class="stat soon"><div class="num" id="stSoon">0</div><div class="lbl">即将到期</div></div>
+      <div class="stat done"><div class="num" id="stDone">0</div><div class="lbl">已完成</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="grp" id="statusFilter">
+        <span class="chip active" data-v="all">全部</span>
+        <span class="chip" data-v="未完成">未完成</span>
+        <span class="chip" data-v="进行中">进行中</span>
+        <span class="chip" data-v="已完成">已完成</span>
+      </div>
+      <div class="grp" id="submitFilter">
+        <span class="chip active" data-v="all">全部方式</span>
+        <span class="chip" data-v="微信接龙小程序提交">接龙</span>
+        <span class="chip" data-v="提交给组长（组长打包发给学委）">组长</span>
+        <span class="chip" data-v="个人提交给老师邮箱">邮箱</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">暂无作业，学委登录后发布吧～</div>
+</div>
+
+<div class="mask" id="mask">
+  <div class="modal" id="modal"></div>
+</div>
+<div class="lightbox" id="lightbox"><img id="lbImg" src="" /></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ========== 配置（部署前改这里，改一次即可） ========== */
+const CONFIG = {
+  className: "XX班",            // ← 改成你的班级名
+  semester: "2026-2027 学年第一学期",
+  adminPassword: "xuewei123",  // ← 改成你自己的管理密码（只用来在网页里显示"编辑"按钮，同学不知道就改不了）
+};
+const STORE_PATH = "data.json"; // 数据文件名（一般不用改）
+
+/* data.json 结构：{ "homeworks": [ {...}, ... ] } */
+const MOCK = { homeworks: [
+  {_id:"m1", course:"高等数学", teacher:"王老师", email:"wang@school.edu",
+   title:"第3章习题 P45-12", requirement:"完成课本第45页第12题，需写出完整计算过程。",
+   images:[], publishDate:"2026-08-24", deadline:"2026-08-29",
+   submitMethod:"微信接龙小程序提交", urgency:"即将到期", status:"未完成"},
+  {_id:"m2", course:"大学英语", teacher:"Li Ming", email:"liming@school.edu",
+   title:"Unit 2 听力 + 作文", requirement:"听力练习册Unit2；作文不少于200词，主题My Hometown。",
+   images:[], publishDate:"2026-08-22", deadline:"2026-08-31",
+   submitMethod:"提交给组长（组长打包发给学委）", urgency:"正常", status:"未完成"},
+  {_id:"m3", course:"数据结构", teacher:"张教授", email:"zhang@school.edu",
+   title:"实验报告：排序算法", requirement:"实现快速排序与归并排序并对比时间复杂度，提交实验报告PDF。",
+   images:[], publishDate:"2026-08-20", deadline:"2026-08-26",
+   submitMethod:"个人提交给老师邮箱", urgency:"紧急", status:"未完成"},
+]};
+
+/* ========== 工具 ========== */
+const WEEK=["周日","周一","周二","周三","周四","周五","周六"];
+function weekday(s){ if(!s) return ""; const d=new Date(s+"T00:00:00"); return WEEK[d.getDay()]; }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function daysLeft(d){ return Math.ceil((new Date(d+"T00:00:00")-new Date(todayStr()+"T00:00:00"))/86400000); }
+function displayUrgency(h){
+  if(h.status==="已完成") return "done";
+  if(daysLeft(h.deadline)<0) return "over";
+  if(h.urgency==="紧急") return "urgent";
+  if(h.urgency==="即将到期"||daysLeft(h.deadline)<=2) return "soon";
+  return "normal";
+}
+const U_LABEL={urgent:"紧急",soon:"即将到期",normal:"正常",over:"已逾期",done:"已完成"};
+const SUB_CLASS={"微信接龙小程序提交":"","提交给组长（组长打包发给学委）":"b2","个人提交给老师邮箱":"b3"};
+
+/* ========== GitHub 配置（学委粘贴一次，存浏览器） ========== */
+const GH_KEY="hw_gh_cfg_v1";
+function loadGH(){ try{return JSON.parse(localStorage.getItem(GH_KEY)||"null");}catch(e){return null;} }
+function saveGH(o){ localStorage.setItem(GH_KEY, JSON.stringify(o)); }
+
+/* ========== 数据读写 ========== */
+let ALL=[];
+async function loadHomeworks(){
+  try{
+    const r = await fetch(STORE_PATH + "?t=" + Date.now());
+    if(!r.ok) throw new Error("no file");
+    const j = await r.json();
+    return (j.homeworks || (Array.isArray(j)?j:[])).slice();
+  }catch(e){
+    console.warn("用示例数据预览：", e.message);
+    return MOCK.homeworks.slice();
+  }
+}
+function encodeUTF8(str){ return btoa(unescape(encodeURIComponent(str))); }
+async function saveHomeworks(){
+  const content = JSON.stringify({ homeworks: ALL }, null, 2);
+  const g = loadGH();
+  if(!g){ downloadJSON(content); toast("未配置 GitHub，已导出 data.json，请手动上传到仓库"); return; }
+  try{
+    // 取当前文件 sha
+    let sha=null;
+    const getUrl=`https://api.github.com/repos/${g.owner}/${g.repo}/contents/${STORE_PATH}?ref=${g.branch}`;
+    const gHeaders={Authorization:`Bearer ${g.pat}`, Accept:"application/vnd.github+json"};
+    try{ const gr=await fetch(getUrl,{headers:gHeaders}); if(gr.ok) sha=(await gr.json()).sha; }catch(_){}
+    const body={ message:"update homework data", content:encodeUTF8(content), branch:g.branch };
+    if(sha) body.sha=sha;
+    const pr=await fetch(getUrl,{method:"PUT",headers:{...gHeaders,"Content-Type":"application/json"},body:JSON.stringify(body)});
+    if(!pr.ok){ const t=await pr.text(); throw new Error("HTTP "+pr.status+" "+t.slice(0,100)); }
+    toast("已保存到 GitHub，全班刷新即见");
+  }catch(e){
+    downloadJSON(content);
+    toast("GitHub 写入失败："+e.message+"（已导出，可手动上传）");
+  }
+}
+function downloadJSON(content){
+  const blob=new Blob([content],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=STORE_PATH; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ========== 渲染 ========== */
+let filterStatus="all", filterSubmit="all";
+const myKey="hw_my_status_v1";
+function getMy(){ try{return JSON.parse(localStorage.getItem(myKey)||"{}");}catch(e){return {};} }
+function setMy(o){ localStorage.setItem(myKey, JSON.stringify(o)); }
+
+function render(){
+  const my=getMy();
+  let list=ALL.filter(h=>{
+    const ms=my[h._id];
+    const eff = ms||h.status;
+    const okS = filterStatus==="all" || eff===filterStatus;
+    const okM = filterSubmit==="all" || h.submitMethod===filterSubmit;
+    return okS && okM;
+  });
+  list.sort((a,b)=>{
+    const ma=my[a._id], mb=my[b._id];
+    const ea=ma||a.status, eb=mb||b.status;
+    const da=(ea==="已完成"?1:0), db2=(eb==="已完成"?1:0);
+    if(da!==db2) return da-db2;
+    return new Date(a.deadline)-new Date(b.deadline);
+  });
+
+  const grid=document.getElementById("grid");
+  grid.innerHTML="";
+  document.getElementById("empty").style.display = list.length?"none":"block";
+
+  list.forEach(h=>{
+    const du=displayUrgency(h);
+    const myStatus=my[h._id]||h.status;
+    const imgs=(h.images||[]).map(u=>`<img src="${u}" onclick="openLB('${u}')" />`).join("");
+    const card=document.createElement("div");
+    card.className="card u-"+du+(myStatus==="已完成"?" done":"");
+    card.innerHTML=`
+      <div class="top">
+        <div class="course">${esc(h.course)}</div>
+        <div class="badge-submit ${SUB_CLASS[h.submitMethod]||""}">${esc(h.submitMethod)}</div>
+      </div>
+      <h3>${esc(h.title)}</h3>
+      <div class="teacher">${esc(h.teacher)} ${h.email?`· <a href="mailto:${esc(h.email)}">${esc(h.email)}</a>`:""}</div>
+      ${h.requirement?`<div class="req">${esc(h.requirement)}</div>`:""}
+      ${imgs?`<div class="imgs">${imgs}</div>`:""}
+      <div class="dates">
+        <div>发布 <b>${h.publishDate} ${weekday(h.publishDate)}</b></div>
+        <div>截止 <b>${h.deadline} ${weekday(h.deadline)}</b></div>
+      </div>
+      <span class="urgencypill ${du}">${U_LABEL[du]}</span>
+      <div class="mystatus">
+        <div class="sbtn ${myStatus==="未完成"?"on":""}" onclick="markMe('${h._id}','未完成')">未完成</div>
+        <div class="sbtn ${myStatus==="进行中"?"on":""}" onclick="markMe('${h._id}','进行中')">进行中</div>
+        <div class="sbtn done ${myStatus==="已完成"?"on":""}" onclick="markMe('${h._id}','已完成')">已完成</div>
+      </div>
+      ${isAdmin()?`<div class="edit-row">
+        <button onclick="editHW('${h._id}')">编辑</button>
+        <button onclick="delHW('${h._id}')">删除</button>
+      </div>`:""}
+    `;
+    grid.appendChild(card);
+  });
+  updateStats();
+}
+function updateStats(){
+  const my=getMy();
+  let total=ALL.length, todo=0, soon=0, done=0;
+  ALL.forEach(h=>{
+    const ms=my[h._id]||h.status;
+    if(ms==="已完成") done++; else { todo++; if(["soon","over","urgent"].includes(displayUrgency(h))) soon++; }
+  });
+  document.getElementById("stTotal").textContent=total;
+  document.getElementById("stTodo").textContent=todo;
+  document.getElementById("stSoon").textContent=soon;
+  document.getElementById("stDone").textContent=done;
+}
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function markMe(id,st){ const my=getMy(); if(st==="未完成") delete my[id]; else my[id]=st; setMy(my); render(); }
+function openLB(u){ document.getElementById("lbImg").src=u; document.getElementById("lightbox").classList.add("show"); }
+document.getElementById("lightbox").onclick=()=>document.getElementById("lightbox").classList.remove("show");
+
+/* ========== 筛选 ========== */
+function bindChips(id,key){
+  document.getElementById(id).querySelectorAll(".chip").forEach(c=>{
+    c.onclick=()=>{
+      document.getElementById(id).querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));
+      c.classList.add("active");
+      if(key==="status") filterStatus=c.dataset.v; else filterSubmit=c.dataset.v;
+      render();
+    };
+  });
+}
+bindChips("statusFilter","status"); bindChips("submitFilter","submit");
+
+/* ========== 管理（登录 + 表单） ========== */
+function isAdmin(){ return sessionStorage.getItem("hw_admin")===CONFIG.adminPassword; }
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2000); }
+
+document.getElementById("lockBtn").onclick=()=>{ isAdmin()?showForm():showLogin(); };
+
+function showLogin(){
+  const m=document.getElementById("modal");
+  m.innerHTML=`<h2>学委登录</h2>
+    <div class="field"><label>管理密码</label><input id="pwd" type="password" placeholder="发布/修改作业用的密码"/></div>
+    <div class="hint">密码在 index.html 的 CONFIG.adminPassword 中设置。</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn-primary" onclick="doLogin()">登录</button>
+    </div>`;
+  openModal();
+}
+function doLogin(){
+  const pwd=document.getElementById("pwd").value;
+  if(pwd===CONFIG.adminPassword){
+    sessionStorage.setItem("hw_admin","ok");
+    closeModal();
+    if(!loadGH()){ showGHSetup(); } else { showForm(); toast("登录成功"); }
+  } else { toast("密码错误"); }
+}
+function showGHSetup(){
+  const g=loadGH()||{};
+  const m=document.getElementById("modal");
+  m.innerHTML=`<h2>配置 GitHub 仓库（一次性）</h2>
+    <div class="hint">数据存到你自己的 GitHub 仓库，永久免费、不过期。同学点链接即可看，你在此页面增删改后会实时同步。</div>
+    <div class="field"><label>仓库所有者用户名</label><input id="g_owner" value="${g.owner||""}" placeholder="如 YaoXiaoju"/></div>
+    <div class="field"><label>仓库名</label><input id="g_repo" value="${g.repo||""}" placeholder="如 homework-ddl"/></div>
+    <div class="field"><label>分支</label><input id="g_branch" value="${g.branch||"main"}"/></div>
+    <div class="field"><label>GitHub Token（Personal Access Token）</label><input id="g_pat" type="password" value="${g.pat||""}" placeholder="ghp_xxxxxxxx"/></div>
+    <div class="hint">Token 只需 repo 权限，存在你浏览器里，不会泄露给同学。</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">暂不</button>
+      <button class="btn-primary" onclick="saveGHSetup()">保存并继续</button>
+    </div>`;
+  openModal();
+}
+function saveGHSetup(){
+  const owner=document.getElementById("g_owner").value.trim();
+  const repo=document.getElementById("g_repo").value.trim();
+  const branch=document.getElementById("g_branch").value.trim()||"main";
+  const pat=document.getElementById("g_pat").value.trim();
+  if(!owner||!repo||!pat){ toast("请填完整"); return; }
+  saveGH({owner,repo,branch,pat});
+  closeModal(); showForm(); toast("已保存，可发布作业");
+}
+
+function showForm(id){
+  const h = id? ALL.find(x=>x._id===id):null;
+  const m=document.getElementById("modal");
+  m.innerHTML=`<h2>${id?"编辑作业":"发布作业"}</h2>
+    <div class="field"><label>课程名称</label><input id="f_course" value="${h?esc(h.course):""}"/></div>
+    <div class="row2">
+      <div class="field"><label>老师姓名</label><input id="f_teacher" value="${h?esc(h.teacher):""}"/></div>
+      <div class="field"><label>老师邮箱</label><input id="f_email" value="${h?esc(h.email):""}"/></div>
+    </div>
+    <div class="field"><label>作业名称</label><input id="f_title" value="${h?esc(h.title):""}"/></div>
+    <div class="field"><label>作业要求</label><textarea id="f_req">${h?esc(h.requirement):""}</textarea></div>
+    <div class="field"><label>作业图片（最多 9 张，自动压缩）</label>
+      <input id="f_imgs" type="file" accept="image/*" multiple onchange="previewImgs(event)"/>
+      <div class="imgprev" id="imgprev"></div>
+      <div class="hint" id="imgHint"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>发布日期</label><input id="f_pub" type="date" value="${h?h.publishDate:todayStr()}"/></div>
+      <div class="field"><label>截止日期</label><input id="f_due" type="date" value="${h?h.deadline:""}"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>提交方式</label>
+        <select id="f_sub">
+          <option ${!h||h.submitMethod==="微信接龙小程序提交"?"selected":""}>微信接龙小程序提交</option>
+          <option ${h&&h.submitMethod==="提交给组长（组长打包发给学委）"?"selected":""}>提交给组长（组长打包发给学委）</option>
+          <option ${h&&h.submitMethod==="个人提交给老师邮箱"?"selected":""}>个人提交给老师邮箱</option>
+        </select>
+      </div>
+      <div class="field"><label>紧急程度</label>
+        <select id="f_urg">
+          <option ${!h||h.urgency==="正常"?"selected":""}>正常</option>
+          <option ${h&&h.urgency==="即将到期"?"selected":""}>即将到期</option>
+          <option ${h&&h.urgency==="紧急"?"selected":""}>紧急</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn-primary" onclick="saveHW('${id||""}')">${id?"保存":"发布"}</button>
+    </div>`;
+  window._pendingImgs = h? (h.images||[]).slice() : [];
+  renderImgPrev();
+  openModal();
+}
+async function previewImgs(e){
+  const files=[...e.target.files].slice(0,9);
+  for(const f of files){
+    if(window._pendingImgs.length>=9) break;
+    try{ window._pendingImgs.push(await fileToDataURL(f)); }
+    catch(err){ toast("图片处理失败，可重试"); }
+  }
+  renderImgPrev();
+}
+function fileToDataURL(file){
+  return new Promise((res,rej)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const max=1000; let w=img.width, h=img.height;
+        if(w>max||h>max){ const r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+        const c=document.createElement("canvas"); c.width=w; c.height=h;
+        c.getContext("2d").drawImage(img,0,0,w,h);
+        res(c.toDataURL("image/jpeg",0.82));
+      };
+      img.onerror=rej; img.src=reader.result;
+    };
+    reader.onerror=rej; reader.readAsDataURL(file);
+  });
+}
+function renderImgPrev(){
+  const box=document.getElementById("imgprev"); if(!box) return;
+  box.innerHTML=window._pendingImgs.map((u,i)=>`<div class="p"><img src="${u}"/><div class="x" onclick="rmImg(${i})">×</div></div>`).join("");
+  document.getElementById("imgHint").textContent=`已选 ${window._pendingImgs.length}/9 张`;
+}
+function rmImg(i){ window._pendingImgs.splice(i,1); renderImgPrev(); }
+
+async function saveHW(id){
+  const data={
+    course:val("f_course"), teacher:val("f_teacher"), email:val("f_email"),
+    title:val("f_title"), requirement:val("f_req"),
+    images:window._pendingImgs.slice(),
+    publishDate:val("f_pub"), deadline:val("f_due"),
+    submitMethod:val("f_sub"), urgency:val("f_urg"),
+    status:"未完成"
+  };
+  if(!data.course||!data.title||!data.deadline){ toast("课程/作业名/截止日期必填"); return; }
+  if(id){ const i=ALL.findIndex(x=>x._id===id); if(i>=0) ALL[i]={...ALL[i],...data}; }
+  else ALL.unshift({_id:"h"+Date.now(),...data});
+  try{ await saveHomeworks(); render(); closeModal(); toast(id?"已保存":"已发布"); }
+  catch(e){ toast("保存失败："+e.message); }
+}
+async function delHW(id){
+  if(!confirm("确定删除这条作业？")) return;
+  ALL=ALL.filter(x=>x._id!==id);
+  try{ await saveHomeworks(); render(); toast("已删除"); }
+  catch(e){ toast("删除失败："+e.message); }
+}
+function editHW(id){ showForm(id); }
+function val(id){ return document.getElementById(id).value.trim(); }
+
+function openModal(){ document.getElementById("mask").classList.add("show"); }
+function closeModal(){ document.getElementById("mask").classList.remove("show"); }
+document.getElementById("mask").onclick=e=>{ if(e.target.id==="mask") closeModal(); };
+
+/* ========== 启动 ========== */
+(async function(){
+  document.getElementById("clsName").childNodes[0].nodeValue = CONFIG.className+" 作业 DDL 共享表";
+  document.getElementById("semName").textContent = CONFIG.semester;
+  ALL=await loadHomeworks();
+  render();
+})();
+</script>
+</body>
+</html>
