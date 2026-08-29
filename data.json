@@ -1,18 +1,5 @@
 {
   "homeworks": [
-    {
-      "_id": "h1",
-      "course": "高等数学",
-      "teacher": "王老师",
-      "email": "wang@school.edu",
-      "title": "第3章习题 P45-12",
-      "requirement": "完成课本第45页第12题，需写出完整计算过程。",
-      "images": [],
-      "publishDate": "2026-08-24",
-      "deadline": "2026-08-29",
-      "submitMethod": "微信接龙小程序提交",
-      "urgency": "即将到期",
-      "status": "未完成"
-    }
+    
   ]
 }
