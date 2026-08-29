@@ -156,9 +156,17 @@ const CONFIG = {
   adminPassword: "xuewei123",  // ← 改成你自己的管理密码（只用来在网页里显示"编辑"按钮，同学不知道就改不了）
 };
 const STORE_PATH = "data.json"; // 数据文件名（一般不用改）
+const TEACHERS = {
+  "王老师": "wang@school.edu",
+  "李老师": "li@school.edu",
+  "张老师": "zhang@school.edu",
+  // 想加几个老师就在这继续写
+};
 
 /* data.json 结构：{ "homeworks": [ {...}, ... ] } */
-
+const MOCK = { homeworks: [
+  
+]};
 /* ========== 工具 ========== */
 const WEEK=["周日","周一","周二","周三","周四","周五","周六"];
 function weekday(s){ if(!s) return ""; const d=new Date(s+"T00:00:00"); return WEEK[d.getDay()]; }
@@ -362,14 +370,25 @@ function saveGHSetup(){
   closeModal(); showForm(); toast("已保存，可发布作业");
 }
 
+function fillEmail(){
+  const t=document.getElementById("f_teacher").value;
+  document.getElementById("f_email").value=TEACHERS[t]||"";
+}
+
 function showForm(id){
   const h = id? ALL.find(x=>x._id===id):null;
   const m=document.getElementById("modal");
   m.innerHTML=`<h2>${id?"编辑作业":"发布作业"}</h2>
     <div class="field"><label>课程名称</label><input id="f_course" value="${h?esc(h.course):""}"/></div>
-    <div class="row2">
-      <div class="field"><label>老师姓名</label><input id="f_teacher" value="${h?esc(h.teacher):""}"/></div>
-      <div class="field"><label>老师邮箱</label><input id="f_email" value="${h?esc(h.email):""}"/></div>
+        <div class="row2">
+      <div class="field">
+        <label>老师姓名</label>
+        <select id="f_teacher" onchange="fillEmail()">
+          <option value="">请选择</option>
+          ${Object.keys(TEACHERS).map(t=>`<option value="${esc(t)}" ${h&&h.teacher===t?"selected":""}>${esc(t)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field"><label>老师邮箱</label><input id="f_email" value="${h?esc(h.email):""}" readonly/></div>
     </div>
     <div class="field"><label>作业名称</label><input id="f_title" value="${h?esc(h.title):""}"/></div>
     <div class="field"><label>作业要求</label><textarea id="f_req">${h?esc(h.requirement):""}</textarea></div>
