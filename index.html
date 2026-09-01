@@ -326,7 +326,7 @@ function bindChips(id,key){
 bindChips("statusFilter","status"); bindChips("submitFilter","submit");
 
 /* ========== 管理（登录 + 表单） ========== */
-function isAdmin(){ return sessionStorage.getItem("hw_admin")===CONFIG.adminPassword; }
+function isAdmin(){ return sessionStorage.getItem("hw_admin")==="ok"; }
 function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2000); }
 
 document.getElementById("lockBtn").onclick=()=>{ isAdmin()?showForm():showLogin(); };
